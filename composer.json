@@ -1,6 +1,9 @@
 {
     "name": "workers/laravel-phpcr-odm",
     "description": "",
+    "keywords": ["laravel", "phpcr" , "doctrine", "odm", "doctrine-odm"],
+    "homepage": "http://github.com/workers/laravel-phpcr-odm",
+    "license": "MIT",
     "authors": [
         {
             "name": "Workers",
