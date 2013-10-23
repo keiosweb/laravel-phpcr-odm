@@ -2,6 +2,7 @@
 
 use Illuminate\Support\ServiceProvider;
 use Doctrine\Common\Annotations\AnnotationRegistry;
+use Doctrine\Common\Persistence\Mapping\Driver\MappingDriverChain as DriverChain;
 
 class LaravelPhpcrOdmServiceProvider extends ServiceProvider {
 
@@ -27,6 +28,11 @@ class LaravelPhpcrOdmServiceProvider extends ServiceProvider {
 		// Register the package configuration with the loader.
 		$this->app['config']->package('workers/laravel-phpcr-odm', __DIR__.'/../../config');
 
+		$this->app->bind('phpcr.drivers.annotation', function()
+		{
+			return $this->getAnnotationDriver();
+		});
+
 		$this->app->bind('phpcr.manager', function()
 		{
 			// Prepare configuration
@@ -35,10 +41,10 @@ class LaravelPhpcrOdmServiceProvider extends ServiceProvider {
 			$config->setProxyNamespace($this->app['config']->get('laravel-phpcr-odm::proxy.namespace', 'Proxies'));
 			$config->setAutoGenerateProxyClasses($this->app['config']->get('laravel-phpcr-odm::proxy.auto_generate', true));
 
-			$config->setMetadataDriverImpl($this->getAnnotationDriver());
+			$chain = new DriverChain();
+			$this->app['events']->fire('phpcr-odm.drivers.chain.creating', array($chain));
 
-			// Add an event to manipulate the configuration
-			$this->app->make('events')->fire('workers.phpcr-odm.dm.before_creating', array($config));
+			$config->setMetadataDriverImpl($chain);
 
 			$documentManager = \Doctrine\ODM\PHPCR\DocumentManager::create($this->app->make('phpcr.session'), $config);
 
@@ -69,9 +75,9 @@ class LaravelPhpcrOdmServiceProvider extends ServiceProvider {
 		AnnotationRegistry::registerFile(__DIR__.'/../../../vendor/doctrine/phpcr-odm/lib/Doctrine/ODM/PHPCR/Mapping/Annotations/DoctrineAnnotations.php');
 
 		$reader = new \Doctrine\Common\Annotations\AnnotationReader();
-		$paths = array(
-			__DIR__.'/../../../../../../app/Workers'
-		);
+		$paths = array();
+
+		$this->app['events']->fire('phpcr-odm.drivers.annotation.creating', array($paths));
 
 		$driver = new \Doctrine\ODM\PHPCR\Mapping\Driver\AnnotationDriver($reader, $paths);
 
