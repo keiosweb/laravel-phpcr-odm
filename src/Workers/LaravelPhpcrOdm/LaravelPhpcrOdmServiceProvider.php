@@ -72,7 +72,7 @@ class LaravelPhpcrOdmServiceProvider extends ServiceProvider {
 	 */
 	public function getAnnotationDriver()
 	{
-		AnnotationRegistry::registerFile(__DIR__.'/../../../vendor/doctrine/phpcr-odm/lib/Doctrine/ODM/PHPCR/Mapping/Annotations/DoctrineAnnotations.php');
+		AnnotationRegistry::registerFile(__DIR__.'/../../../../../doctrine/phpcr-odm/lib/Doctrine/ODM/PHPCR/Mapping/Annotations/DoctrineAnnotations.php');
 
 		$reader = new \Doctrine\Common\Annotations\AnnotationReader();
 		$paths = array();
