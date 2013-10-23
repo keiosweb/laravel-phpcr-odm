@@ -13,6 +13,8 @@ in ```/app/config/app.php```add this to the ```providers``` Array.
 'Workers\LaravelPhpcrJackrabbit\LaravelPhpcrOdmServiceProvider',
 ```
 
+We have to inform Jackrabbit about node-types. 
+
 ## Configuration
 
 Publish the configuration if you need other parametes
@@ -131,8 +133,8 @@ Event::listen('phpcr-odm.drivers.chain.creating', function($chain) use($app)
 #### Example
 
 ```php
-Event::listen('phpcr-odm.drivers.annotation.creating', function($chain) use($app)
+Event::listen('phpcr-odm.drivers.annotation.creating', function($paths)
 {
-	$app[] = 'my/path/to/load'
+	$paths[] = 'my/path/to/load'
 });
 ```
