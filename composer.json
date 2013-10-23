@@ -15,6 +15,9 @@
         "illuminate/support": "4.0.x",
         "doctrine/phpcr-odm": "*"
     },
+    "suggest": {
+        "workers/laravel-phpcr-jackrabbit": "Use Jackrabbit as storage engine for phpcr."
+    },
     "autoload": {
         "psr-0": {
             "Workers\\LaravelPhpcrOdm": "src/"
