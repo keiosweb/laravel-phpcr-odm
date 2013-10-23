@@ -6,6 +6,8 @@ This package includes doctrine odm
 
 ## Installation
 
+You must have an implementation of phpcr installed. So first go [here](https://github.com/Workers/laravel-phpcr-jackrabbit) and install it.
+
 in ```/app/config/app.php```add this to the ```providers``` Array.
 ```php
 'Workers\LaravelPhpcrJackrabbit\LaravelPhpcrOdmServiceProvider',
