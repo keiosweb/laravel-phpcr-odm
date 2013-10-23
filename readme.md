@@ -20,6 +20,8 @@ We have to inform Jackrabbit about node-types.
 Publish the configuration if you need other parametes
 ```php artisan config:publish workers/laravel-phpcr-odm```
 
+Now register system node types in the PHPCR repository: ```php artisan doctrine:phpcr:register-system-node-types```   
+
 ## Usage
 
 Add a driver and namespace/folder to scan for your models
@@ -105,6 +107,23 @@ $dm->flush();
 // Yeah...
 $post = $dm->find(null, '/Post/Post 2');
 
+```
+
+## Commands
+
+```
+doctrine
+  doctrine:phpcr:qb:dump-reference            Generate the official query builder reference in RST format
+  doctrine:phpcr:register-system-node-types   Register system node types in the PHPCR repository
+phpcr
+  phpcr:node-type:register                    Register node types in the PHPCR repository
+  phpcr:node:dump                             Dump subtrees of the content repository
+  phpcr:workspace:create                      Create a workspace in the configured repository
+  phpcr:workspace:export                      Export nodes from the repository, either to the JCR system view format or the document view format
+  phpcr:workspace:import                      Import xml data into the repository, either in JCR system view format or arbitrary xml
+  phpcr:workspace:list                        List all available workspaces in the configured repository
+  phpcr:workspace:purge                       Remove all nodes from a workspace
+  phpcr:workspace:query   
 ```
 
 ## Events
