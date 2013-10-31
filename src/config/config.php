@@ -21,7 +21,7 @@ return array(
 			'driver'    => 'pdo_mysql',
 		    'host'      => 'localhost',
 		    'user'      => 'root',
-		    'password'  => 'cms',
+		    'password'  => 'root',
 		    'dbname'    => 'dbname',
     		'path'      => '', // for SQLite
     		'workspace'   => 'default',
