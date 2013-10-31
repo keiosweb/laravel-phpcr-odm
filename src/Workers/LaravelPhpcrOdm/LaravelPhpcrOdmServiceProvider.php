@@ -53,7 +53,11 @@ class LaravelPhpcrOdmServiceProvider extends ServiceProvider {
 
 			$session = $this->getPhpcrSession();
 
+			$this->app['events']->fire('phpcr-odm.manager.creating', array($session, $config));
+
 			$documentManager = \Doctrine\ODM\PHPCR\DocumentManager::create($session, $config);
+
+			$this->app['events']->fire('phpcr-odm.manager.created', array($documentManager));
 
 			return $documentManager;
 		});
