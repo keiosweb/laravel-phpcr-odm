@@ -14,11 +14,11 @@
         "php": ">=5.3.0",
         "illuminate/support": "4.*",
         "illuminate/events": "4.*",
-        "doctrine/phpcr-odm": "*"
+        "doctrine/phpcr-odm": "*",
+        "jackalope/jackalope-jackrabbit": "1.0.*@dev",
+        "jackalope/jackalope-doctrine-dbal": "1.0.*@dev"
     },
-    "suggest": {
-        "workers/laravel-phpcr-jackrabbit": "Use Jackrabbit as storage engine for phpcr."
-    },
+    "suggest": {},
     "autoload": {
         "psr-0": {
             "Workers\\LaravelPhpcrOdm": "src/"

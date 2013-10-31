@@ -6,8 +6,6 @@ This package includes doctrine odm
 
 ## Installation
 
-You must have an implementation of phpcr installed. So first go [here](https://github.com/Workers/laravel-phpcr-jackrabbit) and install it.
-
 in ```/app/config/app.php```add this to the ```providers``` Array.
 ```php
 'Workers\LaravelPhpcrJackrabbit\LaravelPhpcrOdmServiceProvider',
@@ -17,8 +15,10 @@ We have to inform Jackrabbit about node-types.
 
 ## Configuration
 
-Publish the configuration if you need other parametes
+Publish the configuration if you need other parameters
 ```php artisan config:publish workers/laravel-phpcr-odm```
+
+If using doctrine dbal run ```php artisan jackalope:init:dbal```
 
 Now register system node types in the PHPCR repository: ```php artisan doctrine:phpcr:register-system-node-types```   
 
@@ -112,6 +112,8 @@ $post = $dm->find(null, '/Post/Post 2');
 ## Commands
 
 ```
+jackalope
+  jackalope:init:dbal                         Prepare the database for Jackalope Doctrine-Dbal.
 doctrine
   doctrine:phpcr:qb:dump-reference            Generate the official query builder reference in RST format
   doctrine:phpcr:register-system-node-types   Register system node types in the PHPCR repository
