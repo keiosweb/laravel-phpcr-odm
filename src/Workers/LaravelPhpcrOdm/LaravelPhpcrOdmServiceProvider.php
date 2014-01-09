@@ -3,6 +3,15 @@
 use Illuminate\Support\ServiceProvider;
 use Doctrine\Common\Annotations\AnnotationRegistry;
 use Doctrine\Common\Persistence\Mapping\Driver\MappingDriverChain as DriverChain;
+use Jackalope\Tools\Console\Helper\DoctrineDbalHelper;
+use \Doctrine\ODM\PHPCR\Tools\Console\Helper\DocumentManagerHelper;
+use \Doctrine\Common\Annotations\AnnotationReader;
+use \Doctrine\ODM\PHPCR\Mapping\Driver\AnnotationDriver;
+use \Symfony\Component\Console\Helper\HelperSet;
+use \Doctrine\ODM\PHPCR\Configuration;
+use \Doctrine\ODM\PHPCR\DocumentManager;
+use \Jackalope\RepositoryFactoryDoctrineDBAL;
+use \PHPCR\SimpleCredentials;
 
 class LaravelPhpcrOdmServiceProvider extends ServiceProvider {
 
@@ -25,65 +34,40 @@ class LaravelPhpcrOdmServiceProvider extends ServiceProvider {
 	 */
 	public function register()
 	{
+		$app = $this->app;
+
 		// Register the package configuration with the loader.
-		$this->app['config']->package('workers/laravel-phpcr-odm', __DIR__.'/../../config');
+		$app['config']->package('workers/laravel-phpcr-odm', __DIR__.'/../../config');
 
-		$this->app->bind('phpcr.drivers.annotation', function()
-		{
-			return $this->getAnnotationDriver();
-		});
+		// Get the doctrine connection
+		$app['doctrine.connection'] = $app['db']->connection()
+												->getDoctrineConnection();
 
-		$this->app->bind('phpcr.connections.doctrine', function()
-		{
-			return \Doctrine\DBAL\DriverManager::getConnection($this->app['config']->get('laravel-phpcr-odm::connections.doctrine'));
-		});
+		//// Prepare configuration
+		$app['phpcr.config'] = new Configuration();
+		$app['phpcr.config']->setProxyDir($app['config']->get('laravel-phpcr-odm::proxy.directory'));
+		$app['phpcr.config']->setProxyNamespace($app['config']->get('laravel-phpcr-odm::proxy.namespace'));
+		$app['phpcr.config']->setAutoGenerateProxyClasses($app['config']->get('laravel-phpcr-odm::proxy.auto_generate'));
 
-		$this->app->bind('phpcr.manager', function()
-		{
-			// Prepare configuration
-			$config = new \Doctrine\ODM\PHPCR\Configuration();
-			$config->setProxyDir($this->app['config']->get('laravel-phpcr-odm::proxy.directory'));
-			$config->setProxyNamespace($this->app['config']->get('laravel-phpcr-odm::proxy.namespace'));
-			$config->setAutoGenerateProxyClasses($this->app['config']->get('laravel-phpcr-odm::proxy.auto_generate'));
+		$chain = new DriverChain();
+		// Bind the annotaion driver
+		$chain->addDriver($this->getAnnotationDriver(), 'App');
 
-			$chain = new DriverChain();
-			$this->app['events']->fire('phpcr-odm.drivers.chain.creating', array($chain));
+		// Event: manipulate the driver chain
+		$app['events']->fire('phpcr.drivers.chain.creating', array($chain));
 
-			$config->setMetadataDriverImpl($chain);
-
-			$session = $this->getPhpcrSession();
-
-			$this->app['events']->fire('phpcr-odm.manager.creating', array($session, $config));
-
-			$documentManager = \Doctrine\ODM\PHPCR\DocumentManager::create($session, $config);
-
-			$this->app['events']->fire('phpcr-odm.manager.created', array($documentManager));
-
-			return $documentManager;
-		});
-
-		$this->app['events']->listen('artisan.start', function($artisan)
-		{
-			$dm = $this->app['phpcr.manager'];
-			$doctrineConnection = $this->app['config']->get('laravel-phpcr-odm::connections.doctrine');
-
-			$helpers = array();
-			$helpers['dm'] = new \Doctrine\ODM\PHPCR\Tools\Console\Helper\DocumentManagerHelper(null, $dm);
-			$helpers['jackalope-doctrine-dbal'] = new \Jackalope\Tools\Console\Helper\DoctrineDbalHelper($this->app['phpcr.connections.doctrine']);
-
-			$helperSet = new \Symfony\Component\Console\Helper\HelperSet($helpers);
-
-			$artisan->setHelperSet($helperSet);
-		});
-
-		// Add commands to artisan
-		$this->addCommands();
+		// Use the driver chain
+		$app['phpcr.config']->setMetadataDriverImpl($chain);
+		
+		$this->addPhpcrSession();
+		$this->addDocumentManager($app['phpcr.session'], $app['phpcr.config']);
+		$this->addHelpersToArtisan();
+		$this->addCommandsToArtisan();
 	}
 
 	/**
 	 * Get the annotation driver
-	 *
-	 * @todo  use Driver chain instead
+	 * 
 	 * @return \Doctrine\ODM\PHPCR\Mapping\Driver\AnnotationDriver(
 	 */
 	public function getAnnotationDriver()
@@ -98,102 +82,99 @@ class LaravelPhpcrOdmServiceProvider extends ServiceProvider {
 
 		AnnotationRegistry::registerFile($file);
 
-		$reader = new \Doctrine\Common\Annotations\AnnotationReader();
+		$reader = new AnnotationReader();
 		$paths = array();
 
-		$this->app['events']->fire('phpcr-odm.drivers.annotation.creating', array($paths));
+		// Event: Manipulate the paths the Annotation-Driver should look for classes
+		$this->app['events']->fire('phpcr.drivers.annotation.creating', array($paths));
 
-		$driver = new \Doctrine\ODM\PHPCR\Mapping\Driver\AnnotationDriver($reader, $paths);
+		$driver = new AnnotationDriver($reader, $paths);
 
 		return $driver;
 	}
 
-	public function getPhpcrSession()
+	public function addDocumentManager($session, $config)
 	{
-		$driver = $this->app['config']->get('laravel-phpcr-odm::default');
+		$app = $this->app;
 
-		if($driver === 'doctrine')
-		{
-			return $this->getDoctrineSession();
-		}
-		elseif('jackrabbit')
-		{
-			return $this->getJackRabbitSession();
-		}
+		$app['events']->fire('phpcr.manager.creating', array($session, $config));
+		$app['phpcr.manager'] = DocumentManager::create($session, $config);
+		$app['events']->fire('phpcr.manager.created', array($app['phpcr.manager']));
 	}
 
 	/**
-	 * Get a PHPCR Session
+	 * [getPhpcrSession description]
+	 * @return [type] [description]
 	 */
-	public function getJackRabbitSession()
+	public function addPhpcrSession()
 	{
-		$url = $this->app['config']->get('laravel-phpcr-odm::connections.jackrabbit.url');
-		$user = $this->app['config']->get('laravel-phpcr-odm::connections.jackrabbit.username');
-		$password = $this->app['config']->get('laravel-phpcr-odm::connections.jackrabbit.password');
-		$workspace = $this->app['config']->get('laravel-phpcr-odm::connections.jackrabbit.workspace');
+		$app = $this->app;
 
-		$factory = new \Jackalope\RepositoryFactoryJackrabbit;
+		$factory = new RepositoryFactoryDoctrineDBAL;
 		$repository = $factory->getRepository(
-			array("jackalope.jackrabbit_uri" => $url)
+		    array('jackalope.doctrine_dbal_connection' => $app['doctrine.connection'])
 		);
 
-		$credentials = new \PHPCR\SimpleCredentials($user, $password);
-
-		$session = $repository->login($credentials, $workspace);
-
-		return $session;
-	}
-
-	public function getDoctrineSession()
-	{
-		$workspace = $this->app['config']->get('laravel-phpcr-odm::connections.doctrine.workspace');
-
-		$factory = new \Jackalope\RepositoryFactoryDoctrineDBAL;
-		$repository = $factory->getRepository(
-		    array('jackalope.doctrine_dbal_connection' => $this->app['phpcr.connections.doctrine'])
-		);
+		// Event: Manipulate the PHPCR repository
+		$app['events']->fire('phpcr.repository.creating', array($repository));
 
 		// dummy credentials to comply with the API
-		$credentials = new \PHPCR\SimpleCredentials(null, null);
-		$session = $repository->login($credentials, $workspace);
-
-		return $session;
+		$credentials = new SimpleCredentials(null, null);
+		$app['phpcr.session'] = $repository->login($credentials, $app['config']->get('laravel-phpcr-odm::workspace'));
 	}
 
-	public function addCommands()
+	public function addCommandsToArtisan()
 	{
-		$this->app->bind('phpcr.commands.workspace.create', '\PHPCR\Util\Console\Command\WorkspaceCreateCommand');
-		$this->app->bind('phpcr.commands.workspace.export', '\PHPCR\Util\Console\Command\WorkspaceExportCommand');
-		$this->app->bind('phpcr.commands.workspace.import', '\PHPCR\Util\Console\Command\WorkspaceImportCommand');
-		$this->app->bind('phpcr.commands.workspace.list', '\PHPCR\Util\Console\Command\WorkspaceListCommand');
-		$this->app->bind('phpcr.commands.workspace.import', '\PHPCR\Util\Console\Command\WorkspaceImportCommand');
-		$this->app->bind('phpcr.commands.workspace.purge', '\PHPCR\Util\Console\Command\WorkspacePurgeCommand');
-		$this->app->bind('phpcr.commands.workspace.query', '\PHPCR\Util\Console\Command\WorkspaceQueryCommand');
-		$this->app->bind('phpcr.commands.nodetype.register', '\PHPCR\Util\Console\Command\NodeTypeRegisterCommand');
-		$this->app->bind('phpcr.commands.node.dump', '\PHPCR\Util\Console\Command\NodeDumpCommand');
-		$this->app->bind('phpcr.commands.nodetype.register', '\PHPCR\Util\Console\Command\NodeTypeRegisterCommand');
-		$this->app->bind('phpcr.commands.nodetype.register.system', '\Doctrine\ODM\PHPCR\Tools\Console\Command\RegisterSystemNodeTypesCommand');
-		$this->app->bind('phpcr.commands.querybuilder.dump', '\Doctrine\ODM\PHPCR\Tools\Console\Command\DumpQueryBuilderReferenceCommand');
+		$app = $this->app;
 
-		$this->app->bind('phpcr.commands.dbal.init', '\Jackalope\Tools\Console\Command\InitDoctrineDbalCommand');
+		$app['commands.phpcr.workspace.create'] = new \PHPCR\Util\Console\Command\WorkspaceCreateCommand;
+		$app['commands.phpcr.workspace.export'] = new \PHPCR\Util\Console\Command\WorkspaceExportCommand;
+		$app['commands.phpcr.workspace.import'] = new \PHPCR\Util\Console\Command\WorkspaceImportCommand;
+		$app['commands.phpcr.workspace.list'] = new \PHPCR\Util\Console\Command\WorkspaceListCommand;
+		$app['commands.phpcr.workspace.import'] = new \PHPCR\Util\Console\Command\WorkspaceImportCommand;
+		$app['commands.phpcr.workspace.purge'] = new \PHPCR\Util\Console\Command\WorkspacePurgeCommand;
+		$app['commands.phpcr.workspace.query'] = new \PHPCR\Util\Console\Command\WorkspaceQueryCommand;
+		$app['commands.phpcr.nodetype.register'] = new \PHPCR\Util\Console\Command\NodeTypeRegisterCommand;
+		$app['commands.phpcr.node.dump'] = new \PHPCR\Util\Console\Command\NodeDumpCommand;
+		$app['commands.phpcr.nodetype.register'] = new \PHPCR\Util\Console\Command\NodeTypeRegisterCommand;
+		$app['commands.phpcr.nodetype.register.system'] = new \Doctrine\ODM\PHPCR\Tools\Console\Command\RegisterSystemNodeTypesCommand;
+		$app['commands.phpcr.querybuilder.dump'] = new \Doctrine\ODM\PHPCR\Tools\Console\Command\DumpQueryBuilderReferenceCommand;
+		$app['commands.phpcr.dbal.init'] = new \Jackalope\Tools\Console\Command\InitDoctrineDbalCommand;
 
 
 		$this->commands(array(
-			'phpcr.commands.workspace.create',
-			'phpcr.commands.workspace.export',
-			'phpcr.commands.workspace.import',
-			'phpcr.commands.workspace.list',
-			'phpcr.commands.workspace.import',
-			'phpcr.commands.workspace.purge',
-			'phpcr.commands.workspace.query',
-			'phpcr.commands.nodetype.register',
-			'phpcr.commands.node.dump',
-			'phpcr.commands.nodetype.register',
-			'phpcr.commands.nodetype.register.system',
-			'phpcr.commands.querybuilder.dump',
+			'commands.phpcr.workspace.create',
+			'commands.phpcr.workspace.export',
+			'commands.phpcr.workspace.import',
+			'commands.phpcr.workspace.list',
+			'commands.phpcr.workspace.import',
+			'commands.phpcr.workspace.purge',
+			'commands.phpcr.workspace.query',
+			'commands.phpcr.nodetype.register',
+			'commands.phpcr.node.dump',
+			'commands.phpcr.nodetype.register',
+			'commands.phpcr.nodetype.register.system',
+			'commands.phpcr.querybuilder.dump',
 
-			'phpcr.commands.dbal.init',
+			'commands.phpcr.dbal.init',
 		));
+	}
+
+	public function addHelpersToArtisan()
+	{
+		$app = $this->app;
+
+		$helpers = array();
+		// Add the Document manager helper
+		$helpers['dm'] = new DocumentManagerHelper(null, $app['phpcr.manager']);
+		// add the dbal helper
+		$helpers['jackalope-doctrine-dbal'] = new DoctrineDbalHelper($app['doctrine.connection']);
+		$helperSet = new HelperSet($helpers);
+
+		// Add the helperset to artisan
+		$app['events']->listen('artisan.start', function($artisan) use($helperSet){
+			$artisan->setHelperSet($helperSet);
+		});
 	}
 
 	/**

@@ -8,7 +8,7 @@ This package includes doctrine odm
 
 in ```/app/config/app.php```add this to the ```providers``` Array.
 ```php
-'Workers\LaravelPhpcrJackrabbit\LaravelPhpcrOdmServiceProvider',
+'Workers\LaravelPhpcrOdm\LaravelPhpcrOdmServiceProvider',
 ```
 
 We have to inform Jackrabbit about node-types. 
@@ -18,7 +18,7 @@ We have to inform Jackrabbit about node-types.
 Publish the configuration if you need other parameters
 ```php artisan config:publish workers/laravel-phpcr-odm```
 
-If using doctrine dbal run ```php artisan jackalope:init:dbal```
+If using doctrine dbal run ```php artisan jackalope:init:dbal``` to initialize the database schema.
 
 Now register system node types in the PHPCR repository: ```php artisan doctrine:phpcr:register-system-node-types```   
 
@@ -27,9 +27,9 @@ Now register system node types in the PHPCR repository: ```php artisan doctrine:
 Add a driver and namespace/folder to scan for your models
 
 ```php
-Event::listen('phpcr-odm.drivers.chain.creating', function($chain) use($app)
+Event::listen('phpcr.drivers.chain.creating', function($chain) use($app)
 {
-	$chain->addDriver($app->make('phpcr.drivers.annotation'), 'MyNamespaceToUse');
+	$chain->addDriver($app['phpcr.drivers.annotation'], 'TheNamespaceOfMyModels');
 });
 ```
 
@@ -90,7 +90,7 @@ Now you can use the document manager to manage your data:
 
 ```php
 // Get the document manager
-$dm = $app->make('phpcr.manager');
+$dm = $app['phpcr.manager'];
 
 // get the root node
 $root = $dm->find(null, '/');
@@ -106,7 +106,16 @@ $dm->flush();
 
 // Yeah...
 $post = $dm->find(null, '/Post/Post 2');
+```
 
+Or access the underlying PHPCR session
+
+```php
+$session = $app['phpcr.session'];
+$root = $session->getRootNode();
+$node = $root->addNode('test', 'nt:unstructured');
+
+$session->save();
 ```
 
 ## Commands
@@ -130,7 +139,7 @@ phpcr
 
 ## Events
 
-### phpcr-odm.drivers.chain.creating
+### phpcr.drivers.chain.creating
 
 #### Parameters
 
@@ -139,13 +148,13 @@ phpcr
 #### Example
 
 ```php
-Event::listen('phpcr-odm.drivers.chain.creating', function($chain) use($app)
+$app['event']->listen('phpcr.drivers.chain.creating', function($chain) use($app)
 {
-	$chain->addDriver($app->make('phpcr.drivers.annotation'), 'MyNamespaceToUse');
+	$chain->addDriver($app->make('phpcr.drivers.annotation'), 'TheNamespaceOfMyModels');
 });
 ```
 
-### phpcr-odm.drivers.annotation.creating
+### phpcr.drivers.annotation.creating
 
 #### Parameters
 
@@ -154,7 +163,7 @@ Event::listen('phpcr-odm.drivers.chain.creating', function($chain) use($app)
 #### Example
 
 ```php
-Event::listen('phpcr-odm.drivers.annotation.creating', function($paths)
+$app['event']->listen('phpcr.drivers.annotation.creating', function($paths)
 {
 	$paths[] = 'my/path/to/load'
 });
