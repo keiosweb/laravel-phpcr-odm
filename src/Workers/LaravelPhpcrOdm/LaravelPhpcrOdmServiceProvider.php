@@ -155,7 +155,6 @@ class LaravelPhpcrOdmServiceProvider extends ServiceProvider {
 			'commands.phpcr.nodetype.register',
 			'commands.phpcr.nodetype.register.system',
 			'commands.phpcr.querybuilder.dump',
-
 			'commands.phpcr.dbal.init',
 		));
 	}
