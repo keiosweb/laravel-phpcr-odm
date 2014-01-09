@@ -148,7 +148,7 @@ phpcr
 #### Example
 
 ```php
-$app['event']->listen('phpcr.drivers.chain.creating', function($chain) use($app)
+$app['events']->listen('phpcr.drivers.chain.creating', function($chain) use($app)
 {
 	$chain->addDriver($app->make('phpcr.drivers.annotation'), 'TheNamespaceOfMyModels');
 });
