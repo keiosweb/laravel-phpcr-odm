@@ -164,11 +164,14 @@ class LaravelPhpcrOdmServiceProvider extends ServiceProvider {
 	{
 		$app = $this->app;
 
-		$helpers = array();
-		// Add the Document manager helper
-		$helpers['dm'] = new DocumentManagerHelper(null, $app['phpcr.manager']);
-		// add the dbal helper
-		$helpers['jackalope-doctrine-dbal'] = new DoctrineDbalHelper($app['doctrine.connection']);
+		$helpers = array(
+			'dialog' => new \Symfony\Component\Console\Helper\DialogHelper(),
+	        'phpcr' => new \PHPCR\Util\Console\Helper\PhpcrHelper($app['phpcr.session']),
+	        'phpcr_console_dumper' => new \PHPCR\Util\Console\Helper\PhpcrConsoleDumperHelper(),
+	        'dm' => new DocumentManagerHelper(null, $app['phpcr.manager']),
+	        'jackalope-doctrine-dbal' => new DoctrineDbalHelper($app['doctrine.connection']),
+		);
+
 		$helperSet = new HelperSet($helpers);
 
 		// Add the helperset to artisan
