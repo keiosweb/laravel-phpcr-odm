@@ -120,7 +120,11 @@ class LaravelPhpcrOdmServiceProvider extends ServiceProvider {
 
 		// dummy credentials to comply with the API
 		$credentials = new SimpleCredentials(null, null);
-		$app['phpcr.session'] = $repository->login($credentials, $app['config']->get('laravel-phpcr-odm::workspace'));
+		$workspace = $app['config']->get('laravel-phpcr-odm::workspace');
+
+		// Event: Manipulate the Session
+		$app['events']->fire('phpcr.session.creating', array($repository, $credentials, $workspace));
+		$app['phpcr.session'] = $repository->login($credentials, $workspace);
 	}
 
 	public function addCommandsToArtisan()
